@@ -1,36 +1,91 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# BusTub WebAssembly Project
 
-## Getting Started
+This project integrates the BusTub C++ database with WebAssembly to run in the browser, using Next.js and shadcn/ui for the frontend.
 
-First, run the development server:
+## Prerequisites
 
-```bash
+- Node.js 18+ 
+- Emscripten SDK for compiling C++ to WebAssembly
+- Your BusTub C++ source code
+
+## Setting up Emscripten
+
+1. Install Emscripten:
+\`\`\`bash
+git clone https://github.com/emscripten-core/emsdk.git
+cd emsdk
+./emsdk install latest
+./emsdk activate latest
+source ./emsdk_env.sh
+\`\`\`
+
+## Compiling BusTub to WebAssembly
+
+1. Navigate to your BusTub project directory
+2. Create a build script for WebAssembly:
+
+\`\`\`bash
+#!/bin/bash
+# build-wasm.sh
+
+emcc -O3 \
+  -s WASM=1 \
+  -s EXPORTED_FUNCTIONS='["_execute_query", "_init_database", "_malloc", "_free"]' \
+  -s EXPORTED_RUNTIME_METHODS='["ccall", "cwrap"]' \
+  -s ALLOW_MEMORY_GROWTH=1 \
+  -s MODULARIZE=1 \
+  -s EXPORT_NAME='BusTubModule' \
+  --bind \
+  src/*.cpp \
+  -o public/bustub.wasm
+\`\`\`
+
+3. Run the build script:
+\`\`\`bash
+chmod +x build-wasm.sh
+./build-wasm.sh
+\`\`\`
+
+## Running the Project
+
+1. Install dependencies:
+\`\`\`bash
+npm install
+\`\`\`
+
+2. Start the development server:
+\`\`\`bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+\`\`\`
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+3. Open [http://localhost:3000](http://localhost:3000) in your browser
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Project Structure
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+- `/components/database-interface.tsx` - Main UI component
+- `/app/api/database/` - API routes for database operations
+- `/lib/bustub-wasm.ts` - WebAssembly integration utilities
+- `/public/bustub.wasm` - Your compiled WebAssembly module (after compilation)
 
-## Learn More
+## Integration Steps
 
-To learn more about Next.js, take a look at the following resources:
+1. Compile your BusTub C++ code to WebAssembly using the instructions above
+2. Update `/lib/bustub-wasm.ts` to import and use your compiled WASM module
+3. Modify the API routes to use the actual WASM functions instead of mock data
+4. Test your database operations in the browser interface
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Features
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+- ✅ SQL query execution interface
+- ✅ Database initialization
+- ✅ Sample data loading
+- ✅ Query results visualization
+- ✅ Performance metrics
+- ✅ Responsive design with shadcn/ui
 
-## Deploy on Vercel
+## Next Steps
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+1. Compile your BusTub database to WebAssembly
+2. Integrate the WASM module with the provided API routes
+3. Add more advanced database features as needed
+4. Deploy to Vercel for production use

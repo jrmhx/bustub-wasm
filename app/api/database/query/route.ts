@@ -22,7 +22,7 @@ export async function POST(request: Request) {
 
     // In a real implementation, this would execute the query using your BusTub WASM module
     // For demonstration, we'll return mock data based on the query
-    let mockData: any[] = []
+    let mockData: Record<string, unknown>[] = []
 
     if (query.toLowerCase().includes("select")) {
       // Mock some sample data

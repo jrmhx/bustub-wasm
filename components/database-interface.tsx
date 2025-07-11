@@ -7,19 +7,30 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Loader2, Database, Play, Table } from "lucide-react"
+import { Loader2, Database, Play, Table, TreePine } from "lucide-react"
+import { Terminal } from "@/components/terminal"
 
 interface QueryResult {
   success: boolean
-  data?: any[]
+  data?: unknown[]
   error?: string
   executionTime?: number
+}
+
+interface BPTreeVisualization {
+  success: boolean
+  treeStructure?: string
+  nodeCount?: number
+  depth?: number
+  error?: string
 }
 
 export function DatabaseInterface() {
   const [isLoading, setIsLoading] = useState(false)
   const [queryResult, setQueryResult] = useState<QueryResult | null>(null)
+  const [bptResult, setBptResult] = useState<BPTreeVisualization | null>(null)
   const [sqlQuery, setSqlQuery] = useState("SELECT * FROM students LIMIT 10;")
+  const [selectedTable, setSelectedTable] = useState("students")
   const [isInitialized, setIsInitialized] = useState(false)
 
   const initializeDatabase = async () => {
@@ -36,7 +47,7 @@ export function DatabaseInterface() {
       } else {
         setQueryResult({ success: false, error: result.error })
       }
-    } catch (error) {
+    } catch {
       setQueryResult({ success: false, error: "Failed to initialize database" })
     } finally {
       setIsLoading(false)
@@ -58,7 +69,7 @@ export function DatabaseInterface() {
 
       const result = await response.json()
       setQueryResult(result)
-    } catch (error) {
+    } catch {
       setQueryResult({ success: false, error: "Failed to execute query" })
     } finally {
       setIsLoading(false)
@@ -73,8 +84,28 @@ export function DatabaseInterface() {
       })
       const result = await response.json()
       setQueryResult(result)
-    } catch (error) {
+    } catch {
       setQueryResult({ success: false, error: "Failed to load sample data" })
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const visualizeBPTree = async () => {
+    setIsLoading(true)
+    try {
+      const response = await fetch("/api/database/visualize-bpt", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ table: selectedTable }),
+      })
+
+      const result = await response.json()
+      setBptResult(result)
+    } catch {
+      setBptResult({ success: false, error: "Failed to visualize B+ tree" })
     } finally {
       setIsLoading(false)
     }
@@ -90,12 +121,20 @@ export function DatabaseInterface() {
         </div>
       </div>
 
-      <Tabs defaultValue="query" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-3">
+      <Tabs defaultValue="terminal" className="space-y-6">
+        <TabsList className="grid w-full grid-cols-5">
+          <TabsTrigger value="terminal">Terminal</TabsTrigger>
           <TabsTrigger value="query">SQL Query</TabsTrigger>
+          <TabsTrigger value="bptree">B+ Tree</TabsTrigger>
           <TabsTrigger value="schema">Schema</TabsTrigger>
           <TabsTrigger value="performance">Performance</TabsTrigger>
         </TabsList>
+
+        <TabsContent value="terminal" className="space-y-6">
+          <div className="h-[600px]">
+            <Terminal className="h-full" />
+          </div>
+        </TabsContent>
 
         <TabsContent value="query" className="space-y-6">
           <Card>
@@ -174,7 +213,7 @@ export function DatabaseInterface() {
                       <table className="w-full border-collapse border border-gray-300">
                         <thead>
                           <tr className="bg-muted">
-                            {Object.keys(queryResult.data[0]).map((key) => (
+                            {Object.keys(queryResult.data[0] as Record<string, unknown>).map((key) => (
                               <th key={key} className="border border-gray-300 px-4 py-2 text-left font-semibold">
                                 {key}
                               </th>
@@ -184,7 +223,7 @@ export function DatabaseInterface() {
                         <tbody>
                           {queryResult.data.map((row, index) => (
                             <tr key={index} className="hover:bg-muted/50">
-                              {Object.values(row).map((value, cellIndex) => (
+                              {Object.values(row as Record<string, unknown>).map((value, cellIndex) => (
                                 <td key={cellIndex} className="border border-gray-300 px-4 py-2">
                                   {String(value)}
                                 </td>
@@ -200,6 +239,81 @@ export function DatabaseInterface() {
                 ) : (
                   <Alert variant="destructive">
                     <AlertDescription>{queryResult.error}</AlertDescription>
+                  </Alert>
+                )}
+              </CardContent>
+            </Card>
+          )}
+        </TabsContent>
+
+        <TabsContent value="bptree" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <TreePine className="w-5 h-5" />
+                B+ Tree Visualization
+              </CardTitle>
+              <CardDescription>Visualize the internal structure of B+ tree indexes</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="table-select">Table to Visualize</Label>
+                  <select
+                    id="table-select"
+                    value={selectedTable}
+                    onChange={(e) => setSelectedTable(e.target.value)}
+                    className="px-3 py-2 border rounded-md"
+                    disabled={!isInitialized}
+                  >
+                    <option value="students">students</option>
+                    <option value="courses">courses</option>
+                    <option value="enrollments">enrollments</option>
+                  </select>
+                </div>
+
+                <Button
+                  onClick={visualizeBPTree}
+                  disabled={isLoading || !isInitialized}
+                  className="mt-8"
+                >
+                  {isLoading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <TreePine className="w-4 h-4 mr-2" />}
+                  Visualize Tree
+                </Button>
+              </div>
+
+              {!isInitialized && (
+                <Alert>
+                  <Database className="w-4 h-4" />
+                  <AlertDescription>Initialize the database to visualize B+ trees.</AlertDescription>
+                </Alert>
+              )}
+            </CardContent>
+          </Card>
+
+          {bptResult && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <TreePine className="w-5 h-5" />
+                  Tree Structure
+                  {bptResult.nodeCount && (
+                    <span className="text-sm font-normal text-muted-foreground">
+                      ({bptResult.nodeCount} nodes, depth: {bptResult.depth})
+                    </span>
+                  )}
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {bptResult.success ? (
+                  <div className="bg-muted p-4 rounded-lg">
+                    <pre className="font-mono text-sm whitespace-pre-wrap">
+                      {bptResult.treeStructure}
+                    </pre>
+                  </div>
+                ) : (
+                  <Alert variant="destructive">
+                    <AlertDescription>{bptResult.error}</AlertDescription>
                   </Alert>
                 )}
               </CardContent>

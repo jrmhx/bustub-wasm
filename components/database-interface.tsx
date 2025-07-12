@@ -131,9 +131,11 @@ export function DatabaseInterface() {
         </TabsList>
 
         <TabsContent value="terminal" className="space-y-6">
-          <div className="h-[600px]">
-            <BusTubTerminal className="h-full" />
-          </div>
+          <Card className="h-[600px] p-0 overflow-hidden">
+            <CardContent className="p-0 h-full">
+              <BusTubTerminal className="h-full rounded-lg" />
+            </CardContent>
+          </Card>
         </TabsContent>
 
         <TabsContent value="query" className="space-y-6">

@@ -10,6 +10,7 @@ export function Navigation() {
   const navItems = [
     { href: "/", label: "Database Interface", icon: Database },
     { href: "/terminal", label: "Terminal", icon: TerminalIcon },
+    { href: "/shell", label: "Live Shell", icon: TerminalIcon },
   ]
 
   return (

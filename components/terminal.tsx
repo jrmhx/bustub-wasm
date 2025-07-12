@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from "react"
 import { Card, CardContent } from "@/components/ui/card"
+import { initializeBusTub, executeBusTubCommand, isWasmInitialized } from "@/lib/bustub-wasm"
 
 interface TerminalProps {
   className?: string
@@ -14,12 +15,11 @@ interface TerminalLine {
   timestamp: Date
 }
 
-export function Terminal({ className = "" }: TerminalProps) {
+export function BusTubTerminal({ className = "" }: TerminalProps) {
   const [lines, setLines] = useState<TerminalLine[]>([])
   const [currentInput, setCurrentInput] = useState("")
-  const [isInitialized, setIsInitialized] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
-  const [prompt] = useState("bustub")
+  const [currentPrompt, setCurrentPrompt] = useState("bustub")
   const [multilineBuffer, setMultilineBuffer] = useState("")
   const [commandHistory, setCommandHistory] = useState<string[]>([])
   const [historyIndex, setHistoryIndex] = useState(-1)
@@ -46,6 +46,39 @@ export function Terminal({ className = "" }: TerminalProps) {
     }
   }, [])
 
+  // Initialize BusTub on component mount
+  useEffect(() => {
+    const init = async () => {
+      setIsLoading(true)
+      addLine("BusTub shell is initializing, please wait...", 'system')
+      
+      try {
+        const success = await initializeBusTub()
+        if (success) {
+          addLine("", 'system')
+          addLine("Live Database Shell", 'system')
+          addLine("", 'system')
+          addLine("BusTub is a relational database management system built at Carnegie Mellon University", 'system')
+          addLine("for the Introduction to Database Systems (15-445/645) course. This system was developed", 'system')
+          addLine("for educational purposes and should not be used in production environments.", 'system')
+          addLine("", 'system')
+          addLine("Use \\help to learn about the usage. Use \\clear to clear the page.", 'system')
+          addLine("", 'system')
+          addLine("This is BusTub reference solution running in your browser.", 'system')
+          addLine("", 'system')
+        } else {
+          addLine("Failed to initialize BusTub WASM. Running in fallback mode.", 'error')
+        }
+      } catch {
+        addLine("Failed to initialize BusTub WASM. Running in fallback mode.", 'error')
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    init()
+  }, [])
+
   const addLine = (content: string, type: TerminalLine['type'] = 'output') => {
     const newLine: TerminalLine = {
       id: Date.now().toString() + Math.random(),
@@ -56,196 +89,53 @@ export function Terminal({ className = "" }: TerminalProps) {
     setLines(prev => [...prev, newLine])
   }
 
-  const initializeDatabase = async () => {
-    setIsLoading(true)
-    addLine("Initializing BusTub database...", 'system')
-    
-    try {
-      const response = await fetch("/api/database/init", {
-        method: "POST",
-      })
-      const result = await response.json()
-
-      if (result.success) {
-        setIsInitialized(true)
-        addLine(`Database initialized successfully in ${result.executionTime}ms`, 'system')
-        addLine("", 'system')
-        addLine("BusTub is a relational database management system built at Carnegie Mellon University", 'system')
-        addLine("for the Introduction to Database Systems (15-445/645) course.", 'system')
-        addLine("", 'system')
-        addLine("Use \\help to learn about the usage. Use \\clear to clear the terminal.", 'system')
-        addLine("", 'system')
-      } else {
-        addLine(`Failed to initialize database: ${result.error}`, 'error')
-      }
-    } catch {
-      addLine("Failed to initialize database: Network error", 'error')
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
   const executeCommand = async (command: string) => {
     const trimmedCommand = command.trim()
     
-    // Handle built-in commands
+    // Handle clear command locally
     if (trimmedCommand === "\\clear") {
       setLines([])
       return
     }
-    
-    if (trimmedCommand === "\\help") {
-      addLine("BusTub Database Shell Commands:", 'system')
-      addLine("", 'system')
-      addLine("System Commands:", 'system')
-      addLine("  \\help        - Show this help message", 'system')
-      addLine("  \\clear       - Clear the terminal", 'system')
-      addLine("  \\init        - Initialize the database", 'system')
-      addLine("  \\sample      - Load sample data", 'system')
-      addLine("  \\schema      - Show database schema", 'system')
-      addLine("  \\tables      - List all tables", 'system')
-      addLine("  \\describe <table> - Describe table structure", 'system')
-      addLine("  \\bpt <table> - Visualize B+ tree for table", 'system')
-      addLine("  \\stats       - Show database statistics", 'system')
-      addLine("  \\version     - Show version information", 'system')
-      addLine("", 'system')
-      addLine("SQL Commands:", 'system')
-      addLine("  SELECT, INSERT, UPDATE, DELETE, CREATE, DROP", 'system')
-      addLine("  Commands should end with semicolon (;)", 'system')
-      addLine("  Multi-line commands are supported", 'system')
-      addLine("", 'system')
-      addLine("Examples:", 'system')
-      addLine("  SELECT * FROM students;", 'system')
-      addLine("  INSERT INTO students VALUES (1, 'John', 'john@cmu.edu', 'CS');", 'system')
-      addLine("  \\bpt students", 'system')
-      return
-    }
-    
-    if (trimmedCommand === "\\init") {
-      await initializeDatabase()
-      return
-    }
-    
-    if (trimmedCommand === "\\sample") {
-      setIsLoading(true)
-      try {
-        const response = await fetch("/api/database/sample-data", {
-          method: "POST",
-        })
-        const result = await response.json()
-        if (result.success) {
-          addLine("Sample data loaded successfully", 'system')
-        } else {
-          addLine(`Failed to load sample data: ${result.error}`, 'error')
-        }
-      } catch {
-        addLine("Failed to load sample data: Network error", 'error')
-      } finally {
-        setIsLoading(false)
-      }
-      return
-    }
-    
-    if (trimmedCommand === "\\schema") {
-      addLine("Database schema:", 'system')
-      addLine("  students (id, name, email, major)", 'system')
-      addLine("  courses (id, name, credits, department)", 'system')
-      addLine("  enrollments (student_id, course_id, grade)", 'system')
-      return
-    }
-    
-    if (trimmedCommand === "\\tables") {
-      addLine("Available tables:", 'system')
-      addLine("  students", 'system')
-      addLine("  courses", 'system')
-      addLine("  enrollments", 'system')
-      return
-    }
-    
-    if (trimmedCommand.startsWith("\\describe ")) {
-      const table = trimmedCommand.substring(10).trim()
-      addLine(`Table: ${table}`, 'system')
-      switch (table) {
-        case 'students':
-          addLine("  id       INTEGER PRIMARY KEY", 'system')
-          addLine("  name     VARCHAR(255)", 'system')
-          addLine("  email    VARCHAR(255)", 'system')
-          addLine("  major    VARCHAR(100)", 'system')
-          break
-        case 'courses':
-          addLine("  id          INTEGER PRIMARY KEY", 'system')
-          addLine("  name        VARCHAR(255)", 'system')
-          addLine("  credits     INTEGER", 'system')
-          addLine("  department  VARCHAR(100)", 'system')
-          break
-        case 'enrollments':
-          addLine("  student_id  INTEGER", 'system')
-          addLine("  course_id   INTEGER", 'system')
-          addLine("  grade       VARCHAR(2)", 'system')
-          break
-        default:
-          addLine(`Table '${table}' not found`, 'error')
-      }
-      return
-    }
-    
-    if (trimmedCommand === "\\stats") {
-      addLine("Database Statistics:", 'system')
-      addLine("  Total tables: 3", 'system')
-      addLine("  Storage engine: BusTub", 'system')
-      addLine("  Index type: B+ Tree", 'system')
-      addLine("  Buffer pool size: 64MB", 'system')
-      return
-    }
-    
-    if (trimmedCommand === "\\version") {
-      addLine("BusTub Database Management System", 'system')
-      addLine("Version: WebAssembly Build", 'system')
-      addLine("Built for: CMU 15-445/645 Database Systems", 'system')
-      addLine("Runtime: WebAssembly in Browser", 'system')
-      return
-    }
-
-    // Handle SQL commands
-    if (!isInitialized) {
-      addLine("Database not initialized. Use \\init to initialize.", 'error')
-      return
-    }
 
     setIsLoading(true)
+    
     try {
-      const response = await fetch("/api/database/query", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ query: command }),
-      })
-      const result = await response.json()
+      const result = await executeBusTubCommand(command)
       
-      if (result.success) {
-        if (result.data && result.data.length > 0) {
-          // Format table output
-          const headers = Object.keys(result.data[0])
-          const headerLine = headers.join(" | ")
-          const separatorLine = headers.map(h => "-".repeat(h.length)).join("-+-")
-          
-          addLine(headerLine, 'output')
-          addLine(separatorLine, 'output')
-          
-          result.data.forEach((row: Record<string, unknown>) => {
-            const rowLine = headers.map(h => String(row[h] || "").padEnd(h.length)).join(" | ")
-            addLine(rowLine, 'output')
-          })
-          
-          addLine("", 'output')
-          addLine(`(${result.data.length} row${result.data.length !== 1 ? 's' : ''}) Time: ${result.executionTime}ms`, 'system')
-        } else {
-          addLine(`Query executed successfully. Time: ${result.executionTime}ms`, 'system')
-        }
-      } else {
-        addLine(`Error: ${result.error}`, 'error')
+      // Update prompt if provided
+      if (result.prompt) {
+        setCurrentPrompt(result.prompt)
       }
-    } catch {
-      addLine("Failed to execute query: Network error", 'error')
+      
+      // Display output
+      if (result.output) {
+        // Split output into lines and add each one
+        const outputLines = result.output.split('\n')
+        outputLines.forEach(line => {
+          if (line.length > 0 || outputLines.length > 1) {
+            addLine(line, result.success ? 'output' : 'error')
+          }
+        })
+      }
+      
+      // Handle special return codes
+      if (result.retCode === 1) {
+        addLine("Table truncated due to output limit.", 'system')
+      }
+      
+      if (result.error && !result.output) {
+        addLine(result.error, 'error')
+      }
+      
+      // Add empty line after command output
+      if (result.output || result.error) {
+        addLine("", 'output')
+      }
+      
+    } catch (error) {
+      addLine(`Error: ${error}`, 'error')
+      addLine("", 'output')
     } finally {
       setIsLoading(false)
     }
@@ -259,7 +149,7 @@ export function Terminal({ className = "" }: TerminalProps) {
       const isMultiline = !fullCommand.trim().endsWith(';') && !fullCommand.trim().startsWith('\\')
       
       // Show the input line
-      const promptSymbol = multilineBuffer ? "... " : `${prompt}> `
+      const promptSymbol = multilineBuffer ? "... " : `${currentPrompt}> `
       addLine(`${promptSymbol}${currentInput}`, 'input')
       
       if (isMultiline && !fullCommand.trim().startsWith('\\')) {
@@ -297,13 +187,21 @@ export function Terminal({ className = "" }: TerminalProps) {
           setCurrentInput(commandHistory[commandHistory.length - 1 - newIndex])
         }
       }
+    } else if (e.key === 'Tab') {
+      // Basic tab completion for common commands
+      e.preventDefault()
+      const commands = ['\\help', '\\clear', '\\dt', '\\di', '\\txn', '\\dbgmvcc']
+      const matches = commands.filter(cmd => cmd.startsWith(currentInput))
+      if (matches.length === 1) {
+        setCurrentInput(matches[0])
+      }
     }
   }
 
   const getCurrentPrompt = () => {
     if (isLoading) return "... "
     if (multilineBuffer) return "... "
-    return `${prompt}> `
+    return `${currentPrompt}> `
   }
 
   return (
@@ -317,9 +215,9 @@ export function Terminal({ className = "" }: TerminalProps) {
               <div className="w-3 h-3 bg-yellow-500 rounded-full"></div>
               <div className="w-3 h-3 bg-green-500 rounded-full"></div>
             </div>
-            <div className="text-gray-300 text-xs">BusTub Terminal</div>
+            <div className="text-gray-300 text-xs">BusTub Shell</div>
             <div className="text-gray-500 text-xs">
-              {isInitialized ? 'Ready' : 'Not initialized'}
+              {isWasmInitialized() ? 'WASM Ready' : 'Fallback Mode'}
             </div>
           </div>
 
@@ -329,16 +227,6 @@ export function Terminal({ className = "" }: TerminalProps) {
             className="flex-1 p-4 overflow-y-auto terminal-scrollbar"
             style={{ minHeight: '400px' }}
           >
-            {/* Welcome message */}
-            {lines.length === 0 && (
-              <div className="mb-4 space-y-1">
-                <div className="text-cyan-400 font-bold">Welcome to BusTub Database Shell</div>
-                <div className="text-gray-400">Type \\help for available commands or \\init to initialize the database.</div>
-                <div className="text-gray-400">Version: WebAssembly Build</div>
-                <div></div>
-              </div>
-            )}
-
             {/* Terminal lines */}
             {lines.map((line) => (
               <div key={line.id} className={`font-mono whitespace-pre-wrap ${

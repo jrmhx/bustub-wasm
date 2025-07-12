@@ -8,7 +8,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Loader2, Database, Play, Table, TreePine } from "lucide-react"
-import { Terminal } from "@/components/terminal"
+import { BusTubTerminal } from "@/components/terminal"
 
 interface QueryResult {
   success: boolean
@@ -132,7 +132,7 @@ export function DatabaseInterface() {
 
         <TabsContent value="terminal" className="space-y-6">
           <div className="h-[600px]">
-            <Terminal className="h-full" />
+            <BusTubTerminal className="h-full" />
           </div>
         </TabsContent>
 

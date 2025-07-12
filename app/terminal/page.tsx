@@ -1,4 +1,4 @@
-import { Terminal } from "@/components/terminal"
+import { BusTubTerminal } from "@/components/terminal"
 
 export default function TerminalPage() {
   return (
@@ -11,7 +11,7 @@ export default function TerminalPage() {
       </div>
       
       <div className="h-[calc(100vh-200px)]">
-        <Terminal className="h-full" />
+        <BusTubTerminal className="h-full" />
       </div>
     </div>
   )

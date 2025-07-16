@@ -8,8 +8,7 @@ export function Navigation() {
   const pathname = usePathname()
 
   const navItems = [
-    { href: "/", label: "Database Interface", icon: Database },
-    { href: "/terminal", label: "Terminal", icon: TerminalIcon },
+    { href: "/", label: "Dashboard", icon: Database },
     { href: "/shell", label: "Live Shell", icon: TerminalIcon },
   ]
 

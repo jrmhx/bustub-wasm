@@ -1,21 +1,17 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
-import { Card, CardContent } from "@/components/ui/card"
-import { initializeBusTub, executeBusTubCommand, isWasmInitialized } from "@/lib/bustub-wasm"
-
-interface TerminalProps {
-  className?: string
-}
+import { useState, useEffect, useRef, useCallback } from "react"
+import { initializeBusTub, executeBusTubCommand } from "@/lib/bustub-wasm"
 
 interface TerminalLine {
   id: string
   type: 'input' | 'output' | 'error' | 'system'
   content: string
   timestamp: Date
+  isHtml?: boolean
 }
 
-export function BusTubTerminal({ className = "" }: TerminalProps) {
+export function Terminal() {
   const [lines, setLines] = useState<TerminalLine[]>([])
   const [currentInput, setCurrentInput] = useState("")
   const [isLoading, setIsLoading] = useState(false)
@@ -33,9 +29,21 @@ export function BusTubTerminal({ className = "" }: TerminalProps) {
     }
   }, [lines])
 
-  // Focus input when terminal is clicked
+  // Focus input when terminal is clicked (but not when selecting text)
   useEffect(() => {
-    const handleClick = () => {
+    const handleClick = (e: MouseEvent) => {
+      // Don't focus if user is selecting text
+      const selection = window.getSelection()
+      if (selection && selection.toString().length > 0) {
+        return
+      }
+      
+      // Don't focus if clicking on a specific element (like tables)
+      const target = e.target as HTMLElement
+      if (target.tagName === 'TD' || target.tagName === 'TH' || target.tagName === 'TABLE') {
+        return
+      }
+      
       inputRef.current?.focus()
     }
     
@@ -44,6 +52,25 @@ export function BusTubTerminal({ className = "" }: TerminalProps) {
       terminal.addEventListener('click', handleClick)
       return () => terminal.removeEventListener('click', handleClick)
     }
+  }, [])
+
+  const isHtmlContent = (content: string): boolean => {
+    // Check for common HTML tags that BusTub returns
+    return /<(div|table|thead|tbody|tr|td|th|span|br|hr)\b[^>]*>/i.test(content) || 
+           content.includes('&lt;') || 
+           content.includes('&gt;') ||
+           content.includes('&amp;')
+  }
+
+  const addLine = useCallback((content: string, type: TerminalLine['type'] = 'output') => {
+    const newLine: TerminalLine = {
+      id: Date.now().toString() + Math.random(),
+      type,
+      content,
+      timestamp: new Date(),
+      isHtml: isHtmlContent(content)
+    }
+    setLines(prev => [...prev, newLine])
   }, [])
 
   // Initialize BusTub on component mount
@@ -55,8 +82,11 @@ export function BusTubTerminal({ className = "" }: TerminalProps) {
       try {
         const success = await initializeBusTub()
         if (success) {
+          // Add the welcome message similar to CMU shell
           addLine("", 'system')
           addLine("Live Database Shell", 'system')
+          addLine("", 'system')
+          addLine("Solution Version: local . BusTub Version: local . Built Date: " + new Date().toISOString().slice(0, 8).replace(/-/g, ''), 'system')
           addLine("", 'system')
           addLine("BusTub is a relational database management system built at Carnegie Mellon University", 'system')
           addLine("for the Introduction to Database Systems (15-445/645) course. This system was developed", 'system')
@@ -77,17 +107,7 @@ export function BusTubTerminal({ className = "" }: TerminalProps) {
     }
 
     init()
-  }, [])
-
-  const addLine = (content: string, type: TerminalLine['type'] = 'output') => {
-    const newLine: TerminalLine = {
-      id: Date.now().toString() + Math.random(),
-      type,
-      content,
-      timestamp: new Date(),
-    }
-    setLines(prev => [...prev, newLine])
-  }
+  }, [addLine])
 
   const executeCommand = async (command: string) => {
     const trimmedCommand = command.trim()
@@ -110,13 +130,19 @@ export function BusTubTerminal({ className = "" }: TerminalProps) {
       
       // Display output
       if (result.output) {
-        // Split output into lines and add each one
-        const outputLines = result.output.split('\n')
-        outputLines.forEach(line => {
-          if (line.length > 0 || outputLines.length > 1) {
-            addLine(line, result.success ? 'output' : 'error')
-          }
-        })
+        // Check if the entire output is HTML content
+        if (isHtmlContent(result.output)) {
+          // For HTML content, add as a single line to preserve structure
+          addLine(result.output, result.success ? 'output' : 'error')
+        } else {
+          // Split output into lines and add each one for plain text
+          const outputLines = result.output.split('\n')
+          outputLines.forEach(line => {
+            if (line.length > 0 || outputLines.length > 1) {
+              addLine(line, result.success ? 'output' : 'error')
+            }
+          })
+        }
       }
       
       // Handle special return codes
@@ -198,73 +224,147 @@ export function BusTubTerminal({ className = "" }: TerminalProps) {
     }
   }
 
-  const getCurrentPrompt = () => {
-    if (isLoading) return "... "
-    if (multilineBuffer) return "... "
-    return `${currentPrompt}> `
-  }
-
   return (
-    <Card className={`h-full ${className}`}>
-      <CardContent className="p-0 h-full">
-        <div className="h-full flex flex-col bg-black text-green-400 font-mono text-sm">
-          {/* Terminal Header */}
-          <div className="bg-gray-800 px-4 py-2 flex items-center justify-between border-b border-gray-600">
-            <div className="flex items-center space-x-2">
-              <div className="w-3 h-3 bg-red-500 rounded-full"></div>
-              <div className="w-3 h-3 bg-yellow-500 rounded-full"></div>
-              <div className="w-3 h-3 bg-green-500 rounded-full"></div>
-            </div>
-            <div className="text-gray-300 text-xs">BusTub Shell</div>
-            <div className="text-gray-500 text-xs">
-              {isWasmInitialized() ? 'WASM Ready' : 'Fallback Mode'}
-            </div>
-          </div>
-
-          {/* Terminal Content */}
-          <div 
-            ref={terminalRef}
-            className="flex-1 p-4 overflow-y-auto terminal-scrollbar"
-            style={{ minHeight: '400px' }}
-          >
-            {/* Terminal lines */}
-            {lines.map((line) => (
-              <div key={line.id} className={`font-mono whitespace-pre-wrap ${
-                line.type === 'input' ? 'text-white' :
-                line.type === 'error' ? 'text-red-400' :
-                line.type === 'system' ? 'text-cyan-400' :
-                'text-green-400'
-              }`}>
-                {line.content}
-              </div>
-            ))}
-
-            {/* Current input line */}
-            <div className="flex items-center">
-              <span className="text-yellow-400 mr-2">{getCurrentPrompt()}</span>
-              <input
-                ref={inputRef}
-                type="text"
-                value={currentInput}
-                onChange={(e) => setCurrentInput(e.target.value)}
-                onKeyDown={handleKeyDown}
-                disabled={isLoading}
-                className="flex-1 bg-transparent border-none outline-none text-white font-mono"
-                autoFocus
-                spellCheck={false}
-              />
-              {isLoading && (
-                <span className="text-gray-400 ml-2">
-                  <div className="animate-spin w-4 h-4 border-2 border-gray-400 border-t-transparent rounded-full"></div>
-                </span>
+    <div className="min-h-screen bg-white text-black font-mono relative overflow-hidden">
+      {/* Terminal-specific styles for HTML content */}
+      <style jsx>{`
+        .terminal-html-content table {
+          border-collapse: collapse;
+          font-family: "Source Code Pro", "Courier New", monospace;
+          font-size: inherit;
+          margin: 0;
+          white-space: pre;
+          user-select: text !important;
+          -webkit-user-select: text !important;
+          -moz-user-select: text !important;
+          -ms-user-select: text !important;
+        }
+        .terminal-html-content td, .terminal-html-content th {
+          border: 1px solid #333;
+          padding: 2px 8px;
+          text-align: left;
+          white-space: pre;
+          user-select: text !important;
+          -webkit-user-select: text !important;
+          -moz-user-select: text !important;
+          -ms-user-select: text !important;
+        }
+        .terminal-html-content th {
+          background-color: #f5f5f5;
+          font-weight: bold;
+        }
+        .terminal-html-content tr:nth-child(even) {
+          background-color: #fafafa;
+        }
+        .terminal-html-content div {
+          font-family: inherit;
+          font-size: inherit;
+          white-space: pre-wrap;
+          user-select: text !important;
+          -webkit-user-select: text !important;
+          -moz-user-select: text !important;
+          -ms-user-select: text !important;
+        }
+        .terminal-lines * {
+          user-select: text !important;
+          -webkit-user-select: text !important;
+          -moz-user-select: text !important;
+          -ms-user-select: text !important;
+        }
+      `}</style>
+      
+      {/* Background pattern similar to CMU shell */}
+      <div 
+        className="absolute inset-0 opacity-[0.02] pointer-events-none"
+        style={{
+          backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='50' font-size='50' fill='%23000'%3E🚌%3C/text%3E%3C/svg%3E")`,
+          backgroundSize: '200px 200px',
+          transform: 'rotate(-30deg)',
+          backgroundRepeat: 'repeat'
+        }}
+      />
+      
+      {/* Terminal container */}
+      <div 
+        ref={terminalRef}
+        className="h-screen overflow-y-auto p-4 cursor-text relative z-10"
+        style={{
+          fontSize: 'calc(1.2 * 12px)',
+          lineHeight: '1.2',
+          fontFamily: '"Source Code Pro", "Courier New", monospace',
+          userSelect: 'text',
+          WebkitUserSelect: 'text',
+          MozUserSelect: 'text',
+          msUserSelect: 'text'
+        }}
+      >
+        {/* Terminal lines */}
+        <div className="space-y-0 terminal-lines" style={{ userSelect: 'text' }}>
+          {lines.map((line) => (
+            <div 
+              key={line.id} 
+              className="whitespace-pre-wrap" 
+              style={{ 
+                whiteSpace: 'pre',
+                userSelect: 'text',
+                WebkitUserSelect: 'text',
+                MozUserSelect: 'text',
+                msUserSelect: 'text'
+              }}
+            >
+              {line.type === 'input' && (
+                <span style={{ userSelect: 'text' }}>{line.content}</span>
+              )}
+              {line.type === 'output' && (
+                line.isHtml ? (
+                  <div 
+                    dangerouslySetInnerHTML={{ __html: line.content }}
+                    className="terminal-html-content"
+                    style={{ userSelect: 'text' }}
+                  />
+                ) : (
+                  <span style={{ userSelect: 'text' }}>{line.content}</span>
+                )
+              )}
+              {line.type === 'error' && (
+                line.isHtml ? (
+                  <div 
+                    dangerouslySetInnerHTML={{ __html: line.content }}
+                    className="terminal-html-content text-red-600"
+                    style={{ userSelect: 'text' }}
+                  />
+                ) : (
+                  <span className="text-red-600" style={{ userSelect: 'text' }}>{line.content}</span>
+                )
+              )}
+              {line.type === 'system' && (
+                <span className="text-gray-600" style={{ userSelect: 'text' }}>{line.content}</span>
               )}
             </div>
-
-            {/* Cursor */}
-            <div className="w-2 h-4 bg-green-400 terminal-cursor mt-1"></div>
-          </div>
+          ))}
         </div>
-      </CardContent>
-    </Card>
+
+        {/* Current input line */}
+        <div className="flex items-center">
+          <span className="select-none font-bold">
+            {multilineBuffer ? "... " : `${currentPrompt}> `}
+          </span>
+          <input
+            ref={inputRef}
+            type="text"
+            value={currentInput}
+            onChange={(e) => setCurrentInput(e.target.value)}
+            onKeyDown={handleKeyDown}
+            className="flex-1 bg-transparent outline-none border-none font-mono"
+            style={{ fontSize: 'inherit', fontFamily: 'inherit' }}
+            disabled={isLoading}
+            autoFocus
+          />
+          {isLoading && (
+            <span className="ml-2 text-gray-500">...</span>
+          )}
+        </div>
+      </div>
+    </div>
   )
 }

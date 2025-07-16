@@ -1,10 +1,10 @@
-import { DatabaseInterface } from "@/components/database-interface"
+import { Dashboard } from "@/components/dashboard"
 
 export default function Home() {
   return (
     <main className="min-h-screen bg-background">
       <div className="pt-6">
-        <DatabaseInterface />
+        <Dashboard />
       </div>
     </main>
   )

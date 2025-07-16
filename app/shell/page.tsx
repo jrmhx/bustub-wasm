@@ -1,7 +1,7 @@
-import { FullTerminal } from "@/components/full-terminal"
+import { Terminal } from "@/components/terminal"
 
 export default function BusTubShellPage() {
-  return <FullTerminal />
+  return <Terminal />
 }
 
 export const metadata = {

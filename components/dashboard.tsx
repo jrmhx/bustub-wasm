@@ -8,7 +8,6 @@ import { Textarea } from "@/components/ui/textarea"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Loader2, Database, Play, Table, TreePine } from "lucide-react"
-import { BusTubTerminal } from "@/components/terminal"
 
 interface QueryResult {
   success: boolean
@@ -25,7 +24,7 @@ interface BPTreeVisualization {
   error?: string
 }
 
-export function DatabaseInterface() {
+export function Dashboard() {
   const [isLoading, setIsLoading] = useState(false)
   const [queryResult, setQueryResult] = useState<QueryResult | null>(null)
   const [bptResult, setBptResult] = useState<BPTreeVisualization | null>(null)
@@ -121,22 +120,13 @@ export function DatabaseInterface() {
         </div>
       </div>
 
-      <Tabs defaultValue="terminal" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-5">
-          <TabsTrigger value="terminal">Terminal</TabsTrigger>
+      <Tabs defaultValue="query" className="space-y-6">
+        <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="query">SQL Query</TabsTrigger>
           <TabsTrigger value="bptree">B+ Tree</TabsTrigger>
           <TabsTrigger value="schema">Schema</TabsTrigger>
           <TabsTrigger value="performance">Performance</TabsTrigger>
         </TabsList>
-
-        <TabsContent value="terminal" className="space-y-6">
-          <Card className="h-[600px] p-0 overflow-hidden">
-            <CardContent className="p-0 h-full">
-              <BusTubTerminal className="h-full rounded-lg" />
-            </CardContent>
-          </Card>
-        </TabsContent>
 
         <TabsContent value="query" className="space-y-6">
           <Card>
